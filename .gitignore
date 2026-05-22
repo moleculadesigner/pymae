@@ -1,0 +1,26 @@
+# build artifacts
+build*/
+bin/
+lib/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Cmake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+
+
+# LSP stuff
+compile_commands.json
+.cache
+
+# MacOS stuff
+.DS_Store
