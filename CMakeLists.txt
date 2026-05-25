@@ -14,7 +14,7 @@ FetchContent_Declare(
   GIT_TAG v1.3.3
 )
 FetchContent_MakeAvailable(maeparser)
-FetchContent_GetProperties(maeparser)
+#FetchContent_GetProperties(maeparser)
 #get_target_property(MAE_INCLUDE_DIR maeparser SOURCE_DIR)
 #if(NOT MAE_INCLUDE_DIR)
 #    set(MAE_INCLUDE_DIR "${CMAKE_BINARY_DIR}/_deps/maeparser-src")
@@ -29,8 +29,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(pybind11)
 
 # creating pybind module
-pybind11_add_module(pymae pymae/main.cpp)
+pybind11_add_module(pymae
+  pymae/pybind/module.cpp
+  pymae/pybind/reader_bindings.cpp
+  pymae/pybind/block_bindings.cpp
+)
 
 # Линкуем maeparser (цель называется maeparser)
-target_include_directories(pymae PRIVATE (${maeparser_SOURCE_DIR}))
+target_include_directories(
+  pymae PRIVATE
+  pymae/pybind
+  maeparser
+)
 target_link_libraries(pymae PRIVATE maeparser)
