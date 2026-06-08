@@ -59,7 +59,7 @@ std::shared_ptr<IndexedProperty<T>> prop_from_list_(const py::list& list) {
                 is_null = new boost::dynamic_bitset<>(list.size());
             }
             is_null->set(data.size() - 1);
-            data.push_back(T{});  // Заполняем дефолтным значением
+            data.push_back(T{});  // Fill w/ defaults
         }
     }
     

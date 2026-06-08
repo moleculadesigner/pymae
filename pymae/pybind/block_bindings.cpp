@@ -219,20 +219,6 @@ py::class_<Block, std::shared_ptr<Block>>(m, "Block",
     
         return result;
     })
-
-    /* TODO
-    .def("__getitem__", &MyDict::get)
-    .def("__setitem__", &MyDict::set)
-    .def("__delitem__", &MyDict::remove)
-    .def("__len__", &MyDict::size)
-    .def("__contains__", &MyDict::hasKey)
-    .def("__iter__", [](MyDict &self) {
-        return py::make_iterator(self.keys().begin(), self.keys().end());
-    }, py::keep_alive<0, 1>())
-    .def("keys", &MyDict::keys)
-    .def("values", &MyDict::values)
-    .def("items", &MyDict::items)
-    */
 ;}
 
 

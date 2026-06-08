@@ -1,7 +1,7 @@
 #pragma once
 
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h> // Важно! Конвертирует векторы в списки Python
+#include <pybind11/stl.h>
 
 #include <streambuf>
 
