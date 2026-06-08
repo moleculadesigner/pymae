@@ -28,11 +28,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
+find_package(Boost REQUIRED)
+
 # creating pybind module
 pybind11_add_module(pymae
   pymae/pybind/module.cpp
   pymae/pybind/reader_bindings.cpp
   pymae/pybind/block_bindings.cpp
+  pymae/pybind/iblock_bindings.cpp
 )
 
 # Линкуем maeparser (цель называется maeparser)
@@ -40,5 +43,6 @@ target_include_directories(
   pymae PRIVATE
   pymae/pybind
   maeparser
+  ${Boost_INCLUDE_DIRS}
 )
 target_link_libraries(pymae PRIVATE maeparser)

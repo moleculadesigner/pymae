@@ -2,5 +2,5 @@
 #include <pybind11/pybind11.h>
 
 namespace pymae {
-void bind_block(pybind11::module&);
+void bind_indexed_block(pybind11::module&);
 }

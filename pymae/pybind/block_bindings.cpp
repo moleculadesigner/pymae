@@ -1,10 +1,16 @@
+#include <cmath>
+#include <map>
 #include <memory>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 #include <MaeBlock.hpp>
+#include <pybind11/typing.h>
 #include <string>
 #include <ostream>
+#include <utility>
+#include <vector>
+#include <boost/dynamic_bitset.hpp>
 
 #include "utils.hpp"
 
@@ -25,18 +31,72 @@ with open("structure.mae", "w") as fd:
         
 :param current_indentation: int, level of current indentation
 )doc";
-constexpr auto iblock_write_doc = R"doc(pymae.IndexedBlock.write
-Write indexed block to buffer
+
+enum class PropertyType {
+    R, I, B, S
+};
+
+bool is_valid_python_identifier_(const std::string& name) {
+    if (name.empty()) return false;
     
-:param file: file-like object, must have `write` method,
-e. g. 
-```
-with open("structure.mae", "w") as fd:
-    block.write(fd, 1)
-```
-        
-:param current_indentation: int, level of current indentation
-)doc";
+    if (!std::isalpha(name[0]) && name[0] != '_') return false;
+    
+    for (size_t i = 1; i < name.size(); ++i) {
+        if (!std::isalnum(name[i]) && name[i] != '_') return false;
+    }
+    return true;
+}
+
+std::vector<std::pair<std::string, PropertyType>> get_prop_names_(const Block& self) {
+    const auto& s_props = self.getProperties<std::string>();
+    const auto& r_props = self.getProperties<double>();
+    const auto& i_props = self.getProperties<int>();
+    const auto& b_props = self.getProperties<BoolProperty>();
+    
+    auto prop_names = std::vector<std::pair<std::string, PropertyType>>{};
+    
+    for (const auto& [key, value] : s_props) {
+        prop_names.push_back(std::pair(key, PropertyType::S));
+    }
+    for (const auto& [key, value] : r_props) {
+        prop_names.push_back(std::pair(key, PropertyType::R));
+    }
+    for (const auto& [key, value] : i_props) {
+        prop_names.push_back(std::pair(key, PropertyType::I));
+    }
+    for (const auto& [key, value] : b_props) {
+        prop_names.push_back(std::pair(key, PropertyType::B));
+    }
+    return prop_names;
+}
+
+py::object get_some_property_(const Block& self, const std::string& prop_name) {
+    if (self.hasBoolProperty(prop_name))   return py::cast(self.getBoolProperty(prop_name));
+    if (self.hasIntProperty(prop_name))    return py::cast(self.getIntProperty(prop_name));
+    if (self.hasRealProperty(prop_name))   return py::cast(self.getRealProperty(prop_name));
+    if (self.hasStringProperty(prop_name)) return py::cast(self.getStringProperty(prop_name));
+    
+    throw py::attribute_error("Block object has no property '" + prop_name + "'");
+}
+
+void set_some_property_(Block& self, const std::string& prop_name, const py::object& value) {
+    // bool -> int -> float -> str
+    if (py::isinstance<py::bool_>(value)) {
+        self.setBoolProperty(prop_name, value.cast<bool>());
+    } 
+    else if (py::isinstance<py::int_>(value)) {
+        self.setIntProperty(prop_name, value.cast<int>());
+    } 
+    else if (py::isinstance<py::float_>(value)) {
+        self.setRealProperty(prop_name, value.cast<double>());
+    } 
+    else if (py::isinstance<py::str>(value)) {
+        self.setStringProperty(prop_name, value.cast<std::string>());
+    } 
+    else {
+        throw py::type_error("Unsupported property type for attribute '" + prop_name + "'");
+    }
+}
 
 // Block
 void bind_block(pybind11::module& m) {
@@ -44,12 +104,10 @@ py::class_<Block, std::shared_ptr<Block>>(m, "Block",
     R"doc(A mae Block instance, main data container)doc"
 )
     //---| General data
+    .def(py::init<std::string>())
     .def("getName", &Block::getName)
     .def("__str__", &Block::toString)
     .def("toString", &Block::toString)
-    .def("__repr__", [](const Block& self) {
-        return "MaeBlock <<" + self.getName() + ">>";
-    })
     .def("write",
         [](const Block& self, py::object file_obj, unsigned int indent=0) {
             utils::PythonStreambuf buffer(file_obj);
@@ -96,25 +154,26 @@ py::class_<Block, std::shared_ptr<Block>>(m, "Block",
     .def("getStringProperty", &Block::getStringProperty)
     .def("setStringProperty", &Block::setStringProperty)
     
-    .def("getPropsAsDict",
+    .def_property_readonly("properties",
         [](const Block& self){
-            const auto& s_props = self.getProperties<std::string>();
-            const auto& r_props = self.getProperties<double>();
-            const auto& i_props = self.getProperties<int>();
-            const auto& b_props = self.getProperties<BoolProperty>();
-            
+            auto prop_names = get_prop_names_(self);
             py::dict result;
-            for (const auto& [key, value] : s_props) {
-                result[key.c_str()] = value.c_str();
-            }
-            for (const auto& [key, value] : r_props) {
-                result[key.c_str()] = value;
-            }
-            for (const auto& [key, value] : i_props) {
-                result[key.c_str()] = value;
-            }
-            for (const auto& [key, value] : b_props) {
-                result[key.c_str()] = static_cast<bool>(value);
+            
+            for (const auto& [prop_name, prop_type] : prop_names) {
+                switch (prop_type) {
+                    case PropertyType::S:
+                        result[py::str(prop_name)] = py::str(self.getStringProperty(prop_name));
+                        break;
+                    case PropertyType::R:
+                        result[py::str(prop_name)] = py::float_(self.getRealProperty(prop_name));
+                        break;
+                    case PropertyType::I:
+                        result[py::str(prop_name)] = py::int_(self.getIntProperty(prop_name));
+                        break;
+                    case PropertyType::B:
+                        result[py::str(prop_name)] = py::bool_(static_cast<bool>(self.getBoolProperty(prop_name)));
+                        break;
+                }
             }
             return result;
         },
@@ -125,6 +184,42 @@ py::class_<Block, std::shared_ptr<Block>>(m, "Block",
     .def("__eq__",
         [](const Block& self, const Block& rhs) {return self == rhs;}
     )
+    .def("__getattr__",
+        [](const Block& self, const std::string& name) {
+            if (!is_valid_python_identifier_(name)) {
+                throw py::attribute_error("Block object has no attribute '" + name + "'");
+            }
+            return get_some_property_(self, name);
+        }
+    )
+    .def("__setattr__",
+        [](Block& self, const std::string& name, const py::object& value) {
+            if (!is_valid_python_identifier_(name)) {
+                throw py::attribute_error("Cannot set invalid Python identifier '" + name + "' as attribute");
+            }
+            set_some_property_(self, name, value);
+        }
+    )
+    .def("__dir__", [](py::object& self) {
+        py::list result;
+        
+        // defaults
+        py::object type_obj = self.attr("__class__");
+            for (auto handle : type_obj.attr("__dict__")) {
+                result.append(handle.cast<std::string>()); 
+            }
+        
+        // related
+        Block& core_block = self.cast<Block&>();
+        for (const auto& [p, t] : get_prop_names_(core_block)) {
+            if (is_valid_python_identifier_(p)) {
+                result.append(p);
+            }
+        }
+    
+        return result;
+    })
+
     /* TODO
     .def("__getitem__", &MyDict::get)
     .def("__setitem__", &MyDict::set)
@@ -140,107 +235,5 @@ py::class_<Block, std::shared_ptr<Block>>(m, "Block",
     */
 ;}
 
-template <typename T>
-py::list nullable_values_(
-        const std::shared_ptr<IndexedProperty<T>>& prop,
-        std::function<py::object(const T&)> py_converter
-    ) {
-    //auto& data = prop.data();
-    //auto& null_bs = prop.nullIndices();
-    py::list result;
-    for (size_t i = 0; i < prop->size(); ++i) {
-        if (prop->isDefined(i)) {
-            result.append(py_converter(prop->at(i)));
-        } else {
-            result.append(py::none());
-        }
-    }
-    return result;
-}
 
-void bind_indexed_block(py::module& m) {
-py::class_<IndexedBlock, std::shared_ptr<IndexedBlock>>(m, "IndexedBlock",
-    R"doc(A mae IndexedBlock instance to store serial data.)doc"
-    )
-    // Basics
-    .def("size", &IndexedBlock::size)
-    .def("getName", &IndexedBlock::getName)
-    .def("__str__", &IndexedBlock::toString)
-    .def("toString", &IndexedBlock::toString)
-    .def("write",
-        [](const IndexedBlock& self, py::object file_obj, unsigned int indent=0) {
-            utils::PythonStreambuf buffer(file_obj);
-            std::ostream stream(&buffer);
-            self.write(stream, indent);
-        },
-        iblock_write_doc
-    )
-    .def("__eq__",
-        [](const IndexedBlock& self, const IndexedBlock& rhs) {return self == rhs;}
-    )
-    
-    // Properties
-    .def("hasBoolProperty", &IndexedBlock::hasBoolProperty)
-    .def("getBoolProperty", &IndexedBlock::getBoolProperty)
-    .def("setBoolProperty", &IndexedBlock::setBoolProperty)
-
-    .def("hasIntProperty", &IndexedBlock::hasIntProperty)
-    .def("getIntProperty", &IndexedBlock::getIntProperty)
-    .def("setIntProperty", &IndexedBlock::setIntProperty)
-
-    .def("hasRealProperty", &IndexedBlock::hasRealProperty)
-    .def("getRealProperty", &IndexedBlock::getRealProperty)
-    .def("setRealProperty", &IndexedBlock::setRealProperty)
-
-    .def("hasStringProperty", &IndexedBlock::hasStringProperty)
-    .def("getStringProperty", &IndexedBlock::getStringProperty)
-    .def("setStringProperty", &IndexedBlock::setStringProperty)
-    
-    .def("getPropsAsDict",
-        [](const IndexedBlock& self){
-            const auto& s_props = self.getProperties<std::string>();
-            const auto& r_props = self.getProperties<double>();
-            const auto& i_props = self.getProperties<int>();
-            const auto& b_props = self.getProperties<BoolProperty>();
-            
-            py::dict result;
-            for (const auto& [key, values] : s_props) {
-                result[key.c_str()] = nullable_values_<std::string>(
-                    values, [](const std::string& val) {return py::cast(val.c_str());}
-                );
-            }
-            for (const auto& [key, values] : r_props) {
-                result[key.c_str()] = nullable_values_<double>(
-                    values, [](const double val){return py::cast(val);}
-                );
-            }
-            for (const auto& [key, values] : i_props) {
-                result[key.c_str()] = nullable_values_<int>(
-                    values, [](const int val){return py::cast(val);}
-                );
-            }
-            for (const auto& [key, values] : b_props) {
-                result[key.c_str()] = nullable_values_<BoolProperty>(
-                    values,
-                    [](const BoolProperty& val){return py::cast(static_cast<bool>(val));}
-                );
-            }
-            return result;
-        },
-        "Return a dict with properties of all types"
-    )
-;}
 } // pymae
-/*
-
-
-    template <typename T>
-    void setProperty(const std::string& name,
-                     std::shared_ptr<IndexedProperty<T>> value);
-
-
-    template <typename T>
-    const std::map<std::string, std::shared_ptr<IndexedProperty<T>>>&
-    getProperties() const;
-};
- */

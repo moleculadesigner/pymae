@@ -1,9 +1,11 @@
 
 #include <pybind11/pybind11.h>
-#include <pybind11/stl.h> // Важно! Конвертирует векторы в списки Python
+#include <pybind11/stl.h>
 
 #include "reader_bindings.hpp"
 #include "block_bindings.hpp"
+#include "iblock_bindings.hpp"
+
 
 namespace pymae {
 PYBIND11_MODULE(pymae, m) {
