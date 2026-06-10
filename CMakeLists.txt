@@ -4,7 +4,7 @@ project(pymae_project)
 set(CMAKE_CXX_STANDARD 17)
 
 include(FetchContent)
-set(FETCHCONTENT_QUIET OFF) # Чтобы видеть прогресс скачивания в терминале
+set(FETCHCONTENT_QUIET OFF)
 
 
 # maeparser
@@ -14,11 +14,6 @@ FetchContent_Declare(
   GIT_TAG v1.3.3
 )
 FetchContent_MakeAvailable(maeparser)
-#FetchContent_GetProperties(maeparser)
-#get_target_property(MAE_INCLUDE_DIR maeparser SOURCE_DIR)
-#if(NOT MAE_INCLUDE_DIR)
-#    set(MAE_INCLUDE_DIR "${CMAKE_BINARY_DIR}/_deps/maeparser-src")
-#endif()
 
 # pybind11
 FetchContent_Declare(
@@ -34,13 +29,14 @@ find_package(Boost REQUIRED)
 pybind11_add_module(pymae
   pymae/pybind/module.cpp
   pymae/pybind/reader_bindings.cpp
+  pymae/pybind/writer_bindings.cpp
   pymae/pybind/block_bindings.cpp
   pymae/pybind/iblock_bindings.cpp
+  pymae/pybind/PythonStreambuf.cpp
 )
 
-# Линкуем maeparser (цель называется maeparser)
-target_include_directories(
-  pymae PRIVATE
+target_include_directories(pymae
+  PRIVATE
   pymae/pybind
   maeparser
   ${Boost_INCLUDE_DIRS}

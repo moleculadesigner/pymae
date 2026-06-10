@@ -9,26 +9,9 @@
 #include <vector>
 #include <boost/dynamic_bitset.hpp>
 
-#include "utils.hpp"
-
 namespace pymae {
 namespace py = pybind11;
 using namespace schrodinger::mae;
-
-
-constexpr auto iblock_write_doc = R"doc(pymae.IndexedBlock.write
-Write indexed block to buffer
-    
-:param file: file-like object, must have `write` method,
-e. g. 
-```
-with open("structure.mae", "w") as fd:
-    block.write(fd, 1)
-```
-        
-:param current_indentation: int, level of current indentation
-)doc";
-
 
 template <typename T>
 py::list extract_nullable_values_(
@@ -76,14 +59,6 @@ py::class_<IndexedBlock, std::shared_ptr<IndexedBlock>>(m, "IndexedBlock",
     .def("getName", &IndexedBlock::getName)
     .def("__str__", &IndexedBlock::toString)
     .def("toString", &IndexedBlock::toString)
-    .def("write",
-        [](const IndexedBlock& self, py::object file_obj, unsigned int indent=0) {
-            utils::PythonStreambuf buffer(file_obj);
-            std::ostream stream(&buffer);
-            self.write(stream, indent);
-        },
-        iblock_write_doc
-    )
     .def("__eq__",
         [](const IndexedBlock& self, const IndexedBlock& rhs) {return self == rhs;}
     )
