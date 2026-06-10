@@ -12,25 +12,9 @@
 #include <vector>
 #include <boost/dynamic_bitset.hpp>
 
-#include "utils.hpp"
-
 namespace pymae {
 namespace py = pybind11;
 using namespace schrodinger::mae;
-
-// Docstrings
-constexpr auto block_write_doc = R"doc(pymae.Block.write
-Write block to buffer
-    
-:param file: file-like object, must have `write` method,
-e. g. 
-```
-with open("structure.mae", "w") as fd:
-    block.write(fd, 1)
-```
-        
-:param current_indentation: int, level of current indentation
-)doc";
 
 enum class PropertyType {
     R, I, B, S
@@ -108,14 +92,6 @@ py::class_<Block, std::shared_ptr<Block>>(m, "Block",
     .def("getName", &Block::getName)
     .def("__str__", &Block::toString)
     .def("toString", &Block::toString)
-    .def("write",
-        [](const Block& self, py::object file_obj, unsigned int indent=0) {
-            utils::PythonStreambuf buffer(file_obj);
-            std::ostream stream(&buffer);
-            self.write(stream, indent);
-        },
-        block_write_doc
-    )
     
     //---| Indexed Blocks
     .def("hasIndexedBlockData", &Block::hasIndexedBlockData)
@@ -181,9 +157,7 @@ py::class_<Block, std::shared_ptr<Block>>(m, "Block",
     )
 
     //---| Python API
-    .def("__eq__",
-        [](const Block& self, const Block& rhs) {return self == rhs;}
-    )
+    .def("__eq__", &Block::operator==)
     .def("__getattr__",
         [](const Block& self, const std::string& name) {
             if (!is_valid_python_identifier_(name)) {
